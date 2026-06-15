@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+qrcodes/
+_original_backup/
+data/attendance.xlsx

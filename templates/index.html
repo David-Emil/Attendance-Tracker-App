@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>كشف الحضور</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <style>
+    :root {
+      --parchment: #f6f3ea;
+      --card: #ffffff;
+      --ink: #1e3a34;
+      --ink-soft: #2f534b;
+      --gold: #c29a3b;
+      --gold-soft: #e7d49b;
+      --present: #2e7d5b;
+      --absent: #b5483c;
+      --muted: #71807a;
+      --border: #e7e2d6;
+      --shadow: 0 1px 2px rgba(30,58,52,.06), 0 8px 24px rgba(30,58,52,.07);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: 'Tajawal', system-ui, sans-serif;
+      background: var(--parchment);
+      color: var(--ink);
+      line-height: 1.5;
+      padding-bottom: 90px;
+    }
+    button { font-family: inherit; cursor: pointer; }
+
+    /* ---------------- Header ---------------- */
+    header {
+      background: var(--ink);
+      color: #fff;
+      padding: 14px 18px;
+      position: sticky; top: 0; z-index: 40;
+    }
+    .head-row { display: flex; align-items: center; justify-content: center; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand h1 { white-space: nowrap; }
+    .brand .mark {
+      width: 34px; height: 34px; border-radius: 9px;
+      display: grid; place-items: center;
+      background: linear-gradient(135deg, var(--gold), #a87f25);
+      color: #fff; font-weight: 900; font-size: 18px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+    }
+    .brand h1 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: -.2px; }
+    .brand small { display: block; font-size: 11px; color: var(--gold-soft); font-weight: 500; }
+
+    .datebar {
+      display: flex; align-items: center; gap: 6px; justify-content: center;
+      background: rgba(255,255,255,.10);
+      border-radius: 11px; padding: 4px; margin: 12px auto 0; width: fit-content;
+    }
+    .datebar button {
+      width: 30px; height: 30px; border: 0; border-radius: 8px;
+      background: transparent; color: #fff; font-size: 17px; line-height: 1;
+    }
+    .datebar button:hover { background: rgba(255,255,255,.14); }
+    .datebar label {
+      font-size: 12.5px; font-weight: 700; color: #fff;
+      padding: 0 4px; position: relative; cursor: pointer; white-space: nowrap;
+    }
+    .datebar label.today-flag::after {
+      content: "اليوم"; display: inline-block; margin-inline-start: 6px;
+      font-size: 10px; font-weight: 700; color: var(--ink);
+      background: var(--gold-soft); padding: 1px 6px; border-radius: 6px;
+    }
+    .datebar input[type=date] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer;
+    }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+    /* ---------------- Hero / dial ---------------- */
+    .hero {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; box-shadow: var(--shadow);
+      padding: 22px; display: flex; gap: 22px; align-items: center;
+    }
+    .dial { position: relative; flex: 0 0 132px; width: 132px; height: 132px; }
+    .dial svg { transform: rotate(-90deg); }
+    .dial .ring-bg { fill: none; stroke: var(--border); stroke-width: 12; }
+    .dial .ring-fg {
+      fill: none; stroke: url(#goldgrad); stroke-width: 12; stroke-linecap: round;
+      transition: stroke-dashoffset .9s cubic-bezier(.22,1,.36,1);
+    }
+    .dial .center {
+      position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+    }
+    .dial .pct { font-size: 30px; font-weight: 900; color: var(--ink); line-height: 1; }
+    .dial .pct span { font-size: 15px; font-weight: 700; }
+    .dial .lbl { font-size: 11.5px; color: var(--muted); font-weight: 700; margin-top: 3px; }
+
+    .hero-stats { flex: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    .stat { display: flex; align-items: center; gap: 11px; }
+    .stat .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+    .stat .num { font-size: 22px; font-weight: 900; min-width: 38px; }
+    .stat .cap { font-size: 13.5px; color: var(--muted); font-weight: 500; }
+    .dot.present { background: var(--present); }
+    .dot.absent  { background: var(--absent); }
+    .dot.total   { background: var(--gold); }
+
+    /* ---------------- Action zone ---------------- */
+    .actions { margin-top: 14px; display: flex; gap: 10px; }
+    .btn {
+      border: 0; border-radius: 14px; font-weight: 700; font-size: 15px;
+      padding: 14px 16px; display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px; transition: transform .08s, filter .15s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--ink); color: #fff; flex: 1; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-gold { background: var(--gold); color: #fff; }
+    .btn-ghost { background: #fff; color: var(--ink); border: 1px solid var(--border); }
+
+    .manual { margin-top: 10px; display: flex; gap: 8px; }
+    .manual input {
+      flex: 1; border: 1px solid var(--border); border-radius: 14px;
+      padding: 13px 16px; font-size: 16px; font-family: inherit; text-align: center;
+      background: #fff; color: var(--ink); outline: none;
+    }
+    .manual input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(194,154,59,.18); }
+
+    /* ---------------- Scanner panel ---------------- */
+    #scanPanel { display: none; margin-top: 14px; }
+    #scanPanel.open { display: block; }
+    #reader {
+      width: 100%; max-width: 340px; margin: 0 auto;
+      border-radius: 16px; overflow: hidden; border: 1px solid var(--border);
+    }
+    #reader video { border-radius: 16px; }
+
+    /* ---------------- Tabs ---------------- */
+    .tabs {
+      display: flex; gap: 4px; margin: 20px 0 12px; background: #ece7da;
+      padding: 4px; border-radius: 14px;
+    }
+    .tab {
+      flex: 1; border: 0; background: transparent; color: var(--ink-soft);
+      font-weight: 700; font-size: 13.5px; padding: 9px 4px; border-radius: 10px;
+      transition: background .15s, color .15s;
+    }
+    .tab.active { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+    .tab .badge {
+      display: inline-block; min-width: 18px; font-size: 11px; font-weight: 700;
+      background: var(--border); color: var(--ink-soft); border-radius: 9px; padding: 0 5px; margin-inline-start: 4px;
+    }
+    .tab.active .badge { background: var(--gold-soft); color: var(--ink); }
+
+    /* ---------------- Lists ---------------- */
+    .panel { display: none; }
+    .panel.active { display: block; }
+
+    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+    .search {
+      flex: 1; border: 1px solid var(--border); border-radius: 12px;
+      padding: 11px 14px; font-size: 15px; font-family: inherit; background: #fff; outline: none;
+    }
+    .search:focus { border-color: var(--gold); }
+
+    .list { display: flex; flex-direction: column; gap: 8px; }
+    .row {
+      background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+      padding: 12px 14px; display: flex; align-items: center; gap: 12px;
+    }
+    .avatar {
+      width: 38px; height: 38px; border-radius: 11px; flex: none;
+      display: grid; place-items: center; font-weight: 900; font-size: 15px; color: #fff;
+    }
+    .row .meta { flex: 1; min-width: 0; }
+    .row .name { font-weight: 700; font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .sub { font-size: 12.5px; color: var(--muted); }
+    .row .time { font-size: 13px; color: var(--present); font-weight: 700; font-variant-numeric: tabular-nums; direction: ltr; }
+
+    .pill-btn {
+      border: 1px solid var(--border); background: #fff; border-radius: 11px;
+      padding: 8px 12px; font-weight: 700; font-size: 13px; color: var(--ink); flex: none;
+    }
+    .pill-btn.mark { background: var(--present); color: #fff; border-color: var(--present); }
+    .pill-btn.undo { color: var(--absent); border-color: #ecd3cf; }
+
+    .rate-tag {
+      font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 9px; flex: none;
+      font-variant-numeric: tabular-nums; direction: ltr;
+    }
+
+    .empty { text-align: center; color: var(--muted); padding: 40px 16px; font-size: 14px; }
+    .empty .big { font-size: 30px; margin-bottom: 6px; }
+
+    .section-foot { margin-top: 14px; display: flex; justify-content: center; }
+
+    /* ---------------- Scan feedback overlay ---------------- */
+    #toast {
+      position: fixed; inset: 0; display: none; place-items: center; z-index: 80;
+      background: rgba(30,58,52,.55); backdrop-filter: blur(2px);
+    }
+    #toast.show { display: grid; animation: fade .2s ease; }
+    @keyframes fade { from { opacity: 0; } }
+    .toast-card {
+      background: #fff; border-radius: 22px; padding: 30px 34px; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,.3); animation: pop .35s cubic-bezier(.2,1.2,.4,1);
+      min-width: 240px; max-width: 86vw;
+    }
+    @keyframes pop { from { transform: scale(.8); opacity: 0; } }
+    .toast-icon { font-size: 46px; line-height: 1; }
+    .toast-name { font-size: 22px; font-weight: 900; margin-top: 10px; color: var(--ink); }
+    .toast-msg { font-size: 14px; color: var(--muted); margin-top: 4px; }
+    .toast-card.ok    { border-top: 6px solid var(--present); }
+    .toast-card.warn  { border-top: 6px solid var(--gold); }
+    .toast-card.err   { border-top: 6px solid var(--absent); }
+
+    @media (max-width: 440px) {
+      .hero { flex-direction: column; text-align: center; padding: 20px 16px; }
+      .hero-stats { width: 100%; }
+      .brand h1 { font-size: 16px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .dial .ring-fg, .toast-card, #toast.show { transition: none; animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="head-row">
+      <div class="brand">
+        <div class="mark">✦</div>
+        <div>
+          <h1>كشف الحضور</h1>
+          <small>خدمة الشباب</small>
+        </div>
+      </div>
+    </div>
+    <div class="datebar">
+      <button id="nextDay" title="اليوم التالي">›</button>
+      <label id="dateLabel" class="today-flag">
+        —
+        <input type="date" id="datePicker" />
+      </label>
+      <button id="prevDay" title="اليوم السابق">‹</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- Hero -->
+    <section class="hero">
+      <div class="dial">
+        <svg width="132" height="132" viewBox="0 0 132 132">
+          <defs>
+            <linearGradient id="goldgrad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#d8b352" />
+              <stop offset="1" stop-color="#a87f25" />
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="66" cy="66" r="56" />
+          <circle class="ring-fg" id="ringFg" cx="66" cy="66" r="56"
+                  stroke-dasharray="351.86" stroke-dashoffset="351.86" />
+        </svg>
+        <div class="center">
+          <div class="pct" id="dialPct">0<span>%</span></div>
+          <div class="lbl">نسبة الحضور</div>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="stat"><span class="dot present"></span><span class="num" id="sPresent">0</span><span class="cap">حاضر</span></div>
+        <div class="stat"><span class="dot absent"></span><span class="num" id="sAbsent">0</span><span class="cap">غايب</span></div>
+        <div class="stat"><span class="dot total"></span><span class="num" id="sTotal">0</span><span class="cap">إجمالي المخدومين</span></div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-primary" id="scanToggle">📷 مسح الكود</button>
+    </div>
+    <div class="manual">
+      <input id="manualId" inputmode="numeric" placeholder="أو اكتب رقم المخدوم" />
+      <button class="btn btn-gold" id="manualBtn">تسجيل</button>
+    </div>
+
+    <div id="scanPanel">
+      <div id="reader"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" data-tab="present">الحاضرون <span class="badge" id="bPresent">0</span></button>
+      <button class="tab" data-tab="absent">الغايبون <span class="badge" id="bAbsent">0</span></button>
+      <button class="tab" data-tab="roster">الكشف</button>
+      <button class="tab" data-tab="report">التقرير</button>
+    </div>
+
+    <!-- Present -->
+    <div class="panel active" id="panel-present">
+      <div class="list" id="presentList"></div>
+      <div class="section-foot"><button class="btn btn-ghost" id="exportDay">⬇ تنزيل حضور اليوم (Excel)</button></div>
+    </div>
+
+    <!-- Absent -->
+    <div class="panel" id="panel-absent">
+      <div class="list" id="absentList"></div>
+    </div>
+
+    <!-- Roster -->
+    <div class="panel" id="panel-roster">
+      <div class="toolbar">
+        <input class="search" id="rosterSearch" placeholder="ابحث بالاسم أو الرقم…" />
+      </div>
+      <div class="list" id="rosterList"></div>
+    </div>
+
+    <!-- Report -->
+    <div class="panel" id="panel-report">
+      <div class="toolbar">
+        <input class="search" id="reportSearch" placeholder="ابحث بالاسم…" />
+      </div>
+      <div class="list" id="reportList"></div>
+      <div class="section-foot"><button class="btn btn-ghost" id="exportSummary">⬇ تنزيل التقرير الكامل (Excel)</button></div>
+    </div>
+  </div>
+
+  <!-- Scan feedback -->
+  <div id="toast"><div class="toast-card" id="toastCard">
+    <div class="toast-icon" id="toastIcon"></div>
+    <div class="toast-name" id="toastName"></div>
+    <div class="toast-msg" id="toastMsg"></div>
+  </div></div>
+
+<script>
+const RING_LEN = 351.86;
+let currentDate = new Date().toISOString().slice(0,10);
+let dayData = null;
+let summaryData = null;
+let qr = null, scanning = false;
+let lastScan = { id: null, t: 0 };
+
+const $ = (id) => document.getElementById(id);
+const todayStr = () => new Date().toISOString().slice(0,10);
+
+// ---- color from name (stable avatar tint) ----
+const TINTS = ['#2e7d5b','#1e3a34','#c29a3b','#7a6a3a','#3f6e63','#9c6b2e','#4a5d57','#b5483c'];
+function tint(seed){ let h=0; for(const c of String(seed)) h=(h*31+c.charCodeAt(0))>>>0; return TINTS[h%TINTS.length]; }
+function initials(name){ const p=String(name).trim().split(/\s+/); return (p[0]||'؟').slice(0,2); }
+
+// ---- date handling ----
+function fmtDate(d){
+  const parts = d.split('-');
+  const days=['الأحد','الإثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dt = new Date(d+'T00:00:00');
+  const months=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `${days[dt.getDay()]} ${parseInt(parts[2])} ${months[dt.getMonth()-0]}`;
+}
+function setDate(d){
+  currentDate = d;
+  const lbl = $('dateLabel');
+  lbl.firstChild.textContent = fmtDate(d) + ' ';
+  lbl.classList.toggle('today-flag', d === todayStr());
+  $('datePicker').value = d;
+  loadDay();
+}
+function shiftDate(delta){
+  const dt = new Date(currentDate+'T00:00:00');
+  dt.setDate(dt.getDate()+delta);
+  setDate(dt.toISOString().slice(0,10));
+}
+
+// ---- rendering ----
+function renderHero(s){
+  $('sPresent').textContent = s.present;
+  $('sAbsent').textContent = s.absent;
+  $('sTotal').textContent = s.total;
+  $('dialPct').innerHTML = s.rate + '<span>%</span>';
+  $('ringFg').style.strokeDashoffset = RING_LEN * (1 - s.rate/100);
+  $('bPresent').textContent = s.present;
+  $('bAbsent').textContent = s.absent;
+}
+
+function presentRow(r){
+  return `<div class="row">
+    <div class="avatar" style="background:${tint(r.id)}">${initials(r.name)}</div>
+    <div class="meta"><div class="name">${r.name}</div><div class="sub">رقم ${r.id}</div></div>
+    <div class="time">${r.time||''}</div>
+    <button class="pill-btn undo" onclick="undo(${r.id})">تراجع</button>
+  </div>`;
+}
+function absentRow(r){
+  return `<div class="row">
+    <div class="avatar" style="background:#cdc6b4">${initials(r.name)}</div>
+    <div class="meta"><div class="name">${r.name}</div><div class="sub">رقم ${r.id}</div></div>
+    <button class="pill-btn mark" onclick="checkin(${r.id})">تسجيل حضور</button>
+  </div>`;
+}
+function rosterRow(r){
+  const btn = r.present
+    ? `<button class="pill-btn undo" onclick="undo(${r.id})">حاضر ✓</button>`
+    : `<button class="pill-btn mark" onclick="checkin(${r.id})">تسجيل</button>`;
+  return `<div class="row" data-search="${r.name} ${r.id}">
+    <div class="avatar" style="background:${r.present?tint(r.id):'#cdc6b4'}">${initials(r.name)}</div>
+    <div class="meta"><div class="name">${r.name}</div><div class="sub">رقم ${r.id}${r.time?' · '+r.time:''}</div></div>
+    ${btn}
+  </div>`;
+}
+function reportRow(r){
+  const c = r.rate>=75?'var(--present)':r.rate>=40?'var(--gold)':'var(--absent)';
+  const bg = r.rate>=75?'#e3f0ea':r.rate>=40?'#f6eed6':'#f6e0dd';
+  return `<div class="row" data-search="${r.name} ${r.id}">
+    <div class="avatar" style="background:${tint(r.id)}">${initials(r.name)}</div>
+    <div class="meta"><div class="name">${r.name}</div><div class="sub">حضر ${r.count} من ${summaryData.sessions} مرة</div></div>
+    <span class="rate-tag" style="color:${c};background:${bg}">${r.rate}%</span>
+  </div>`;
+}
+function emptyMsg(icon, txt){ return `<div class="empty"><div class="big">${icon}</div>${txt}</div>`; }
+
+function renderDay(){
+  const d = dayData;
+  renderHero(d.stats);
+  $('presentList').innerHTML = d.present.length
+    ? d.present.map(presentRow).join('') : emptyMsg('🕊️','لسه محدش سجّل حضور');
+  $('absentList').innerHTML = d.absent.length
+    ? d.absent.map(absentRow).join('') : emptyMsg('🎉','كله حاضر! مفيش غايبين');
+  $('rosterList').innerHTML = d.roster.map(rosterRow).join('');
+  filterList('rosterSearch','rosterList');
+}
+
+function renderReport(){
+  if(!summaryData) return;
+  $('reportList').innerHTML = summaryData.students.map(reportRow).join('');
+  filterList('reportSearch','reportList');
+}
+
+// ---- data ----
+async function loadDay(){
+  const r = await fetch('/api/day?date='+currentDate);
+  dayData = await r.json();
+  renderDay();
+}
+async function loadSummary(){
+  const r = await fetch('/api/summary');
+  summaryData = await r.json();
+  renderReport();
+}
+
+// ---- actions ----
+async function checkin(id){
+  const r = await fetch('/checkin', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id:String(id), date:currentDate})
+  });
+  const data = await r.json();
+  if(data.status==='ok')        showToast('ok','✅', data.name, 'تم تسجيل الحضور');
+  else if(data.status==='duplicate') showToast('warn','⚠️','مسجّل قبل كده','الاسم ده اتسجّل النهاردة');
+  else                          showToast('err','❌','غير موجود','الرقم مش في الكشف');
+  await loadDay();
+}
+async function undo(id){
+  await fetch('/uncheck', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({id:String(id), date:currentDate})
+  });
+  await loadDay();
+}
+
+// ---- toast + beep ----
+let actx=null;
+function beep(ok){
+  try{
+    actx = actx || new (window.AudioContext||window.webkitAudioContext)();
+    const o=actx.createOscillator(), g=actx.createGain();
+    o.connect(g); g.connect(actx.destination);
+    o.frequency.value = ok?880:240; o.type='sine';
+    g.gain.setValueAtTime(.001, actx.currentTime);
+    g.gain.exponentialRampToValueAtTime(.25, actx.currentTime+.01);
+    g.gain.exponentialRampToValueAtTime(.001, actx.currentTime+.18);
+    o.start(); o.stop(actx.currentTime+.2);
+  }catch(e){}
+}
+let toastTimer=null;
+function showToast(kind, icon, name, msg){
+  beep(kind==='ok');
+  if(navigator.vibrate) navigator.vibrate(kind==='ok'?40:[30,40,30]);
+  $('toastCard').className = 'toast-card '+kind;
+  $('toastIcon').textContent = icon;
+  $('toastName').textContent = name;
+  $('toastMsg').textContent = msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>$('toast').classList.remove('show'), 1400);
+}
+$('toast').addEventListener('click', ()=>$('toast').classList.remove('show'));
+
+// ---- manual ----
+function submitManual(){
+  const v = $('manualId').value.trim();
+  if(!v) return;
+  checkin(v);
+  $('manualId').value='';
+}
+$('manualBtn').addEventListener('click', submitManual);
+$('manualId').addEventListener('keypress', e=>{ if(e.key==='Enter') submitManual(); });
+
+// ---- scanner ----
+function onScan(text){
+  const now = Date.now();
+  if(text === lastScan.id && now - lastScan.t < 2500) return; // debounce
+  lastScan = { id:text, t:now };
+  checkin(text);
+}
+function cameraAllowed(){
+  // Browsers only expose the camera over https or on localhost.
+  return window.isSecureContext
+      || ['localhost','127.0.0.1'].includes(location.hostname);
+}
+async function startCamera(){
+  qr = qr || new Html5Qrcode('reader');
+  const config = { fps:10, qrbox:230 };
+  // Ask for the rear camera directly — most reliable across phones.
+  try{
+    await qr.start({ facingMode:'environment' }, config, onScan);
+    return;
+  }catch(e){
+    // Fall back to picking a camera from the list.
+    const cams = await Html5Qrcode.getCameras();
+    if(!cams || !cams.length) throw new Error('no-camera');
+    await qr.start(cams[cams.length-1].id, config, onScan);
+  }
+}
+async function toggleScan(){
+  const panel = $('scanPanel');
+  if(scanning){
+    try{ await qr.stop(); }catch(e){}
+    scanning=false; panel.classList.remove('open');
+    $('scanToggle').textContent='📷 مسح الكود';
+    return;
+  }
+  if(!cameraAllowed()){
+    showToast('err','🔒','الكاميرا محتاجة رابط آمن',
+      'افتح التطبيق على رابط https (زي رابط Railway) عشان الكاميرا تشتغل. لحد كده استخدم الإدخال اليدوي.');
+    return;
+  }
+  panel.classList.add('open');
+  $('scanToggle').textContent='■ إيقاف الكاميرا';
+  try{
+    await startCamera();
+    scanning=true;
+  }catch(e){
+    panel.classList.remove('open');
+    $('scanToggle').textContent='📷 مسح الكود';
+    const denied = (e && (e.name==='NotAllowedError' || /permission/i.test(e.message||'')));
+    if(denied)
+      showToast('err','📷','مفيش إذن للكاميرا','اسمح للموقع باستخدام الكاميرا من إعدادات المتصفح.');
+    else
+      showToast('err','📷','تعذّر فتح الكاميرا','جرّب تاني أو استخدم الإدخال اليدوي.');
+  }
+}
+$('scanToggle').addEventListener('click', toggleScan);
+
+// ---- tabs ----
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    $('panel-'+t.dataset.tab).classList.add('active');
+    if(t.dataset.tab==='report' && !summaryData) loadSummary();
+  });
+});
+
+// ---- search ----
+function filterList(inputId, listId){
+  const q = $(inputId).value.trim().toLowerCase();
+  $(listId).querySelectorAll('.row').forEach(row=>{
+    const hay = (row.dataset.search||'').toLowerCase();
+    row.style.display = q && !hay.includes(q) ? 'none' : '';
+  });
+}
+$('rosterSearch').addEventListener('input', ()=>filterList('rosterSearch','rosterList'));
+$('reportSearch').addEventListener('input', ()=>filterList('reportSearch','reportList'));
+
+// ---- date controls ----
+$('prevDay').addEventListener('click', ()=>shiftDate(-1));
+$('nextDay').addEventListener('click', ()=>shiftDate(1));
+$('datePicker').addEventListener('change', e=>{ if(e.target.value) setDate(e.target.value); });
+
+// ---- exports ----
+$('exportDay').addEventListener('click', ()=>window.location='/export/day?date='+currentDate);
+$('exportSummary').addEventListener('click', ()=>window.location='/export/summary');
+
+// ---- boot ----
+setDate(currentDate);
+</script>
+</body>
+</html>

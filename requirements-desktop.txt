@@ -1,0 +1,6 @@
+# Local-only extras for the desktop scanner (scanner.py / app.py)
+# and QR generation (generate_qr.py). NOT needed for the Railway web app.
+-r requirements.txt
+opencv-python==4.13.0.92
+pyzbar==0.1.9
+qrcode[pil]==8.2
