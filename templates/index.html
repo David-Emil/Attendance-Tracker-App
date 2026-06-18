@@ -166,6 +166,38 @@
     }
     .search:focus { border-color: var(--gold); }
 
+    /* ---------------- Add student ---------------- */
+    .icon-btn {
+      flex: none; border: 1px solid var(--border); background: #fff; color: var(--ink);
+      border-radius: 12px; padding: 11px 14px; font-weight: 700; font-size: 14px;
+      display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    }
+    .icon-btn:active { transform: scale(.97); }
+    .add-card {
+      display: none; background: var(--card); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px; margin-bottom: 12px;
+      box-shadow: var(--shadow);
+    }
+    .add-card.open { display: block; }
+    .add-card .field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
+    .add-card label { font-size: 12.5px; font-weight: 700; color: var(--ink-soft); }
+    .add-card input {
+      border: 1px solid var(--border); border-radius: 12px; padding: 11px 14px;
+      font-size: 15px; font-family: inherit; background: #fff; color: var(--ink); outline: none;
+    }
+    .add-card input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(194,154,59,.18); }
+    .add-card .hint { font-size: 11.5px; color: var(--muted); font-weight: 400; }
+    .add-card .row-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .add-card .row-actions .btn { flex: 1; padding: 12px; }
+    .pill-btn.remove {
+      color: var(--absent); border-color: #ecd3cf; background: #fff;
+      padding: 8px 10px; margin-inline-start: 6px;
+    }
+    .added-tag {
+      font-size: 10.5px; font-weight: 700; color: var(--gold); background: #f6eed6;
+      border-radius: 7px; padding: 1px 6px; margin-inline-start: 6px; vertical-align: middle;
+    }
+
     .list { display: flex; flex-direction: column; gap: 8px; }
     .row {
       background: var(--card); border: 1px solid var(--border); border-radius: 14px;
@@ -311,7 +343,24 @@
     <div class="panel" id="panel-roster">
       <div class="toolbar">
         <input class="search" id="rosterSearch" placeholder="ابحث بالاسم أو الرقم…" />
+        <button class="icon-btn" id="addToggle">➕ إضافة مخدوم</button>
       </div>
+
+      <div class="add-card" id="addCard">
+        <div class="field">
+          <label for="addName">اسم المخدوم</label>
+          <input id="addName" placeholder="اكتب الاسم بالكامل" />
+        </div>
+        <div class="field">
+          <label for="addId">الرقم <span class="hint">(اختياري — هيتحدد تلقائيًا لو سِبته فاضي)</span></label>
+          <input id="addId" inputmode="numeric" placeholder="رقم تلقائي" />
+        </div>
+        <div class="row-actions">
+          <button class="btn btn-gold" id="addSaveBtn">حفظ</button>
+          <button class="btn btn-ghost" id="addCancelBtn">إلغاء</button>
+        </div>
+      </div>
+
       <div class="list" id="rosterList"></div>
     </div>
 
@@ -400,10 +449,12 @@ function rosterRow(r){
   const btn = r.present
     ? `<button class="pill-btn undo" onclick="undo(${r.id})">حاضر ✓</button>`
     : `<button class="pill-btn mark" onclick="checkin(${r.id})">تسجيل</button>`;
+  const tag = r.added ? `<span class="added-tag">مُضاف</span>` : '';
+  const rm  = r.added ? `<button class="pill-btn remove" title="حذف المخدوم المُضاف" onclick="removeStudent(${r.id}, '${String(r.name).replace(/'/g,"\\'")}')">✕</button>` : '';
   return `<div class="row" data-search="${r.name} ${r.id}">
     <div class="avatar" style="background:${r.present?tint(r.id):'#cdc6b4'}">${initials(r.name)}</div>
-    <div class="meta"><div class="name">${r.name}</div><div class="sub">رقم ${r.id}${r.time?' · '+r.time:''}</div></div>
-    ${btn}
+    <div class="meta"><div class="name">${r.name}${tag}</div><div class="sub">رقم ${r.id}${r.time?' · '+r.time:''}</div></div>
+    ${btn}${rm}
   </div>`;
 }
 function reportRow(r){
@@ -503,6 +554,63 @@ function submitManual(){
 }
 $('manualBtn').addEventListener('click', submitManual);
 $('manualId').addEventListener('keypress', e=>{ if(e.key==='Enter') submitManual(); });
+
+// ---- add / remove student ----
+async function openAddCard(){
+  $('addCard').classList.add('open');
+  $('addName').value=''; $('addId').value='';
+  try{
+    const r = await fetch('/api/next_id');
+    const d = await r.json();
+    $('addId').placeholder = 'رقم تلقائي: ' + d.next_id;
+  }catch(e){}
+  $('addName').focus();
+}
+function closeAddCard(){ $('addCard').classList.remove('open'); }
+function toggleAddCard(){
+  $('addCard').classList.contains('open') ? closeAddCard() : openAddCard();
+}
+async function submitAddStudent(){
+  const name = $('addName').value.trim();
+  const id   = $('addId').value.trim();
+  if(!name){ showToast('err','✏️','اكتب الاسم','لازم تكتب اسم المخدوم'); return; }
+  const r = await fetch('/add_student', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ name, id: id || null })
+  });
+  const d = await r.json();
+  if(d.status==='ok'){
+    showToast('ok','✅', d.name, 'تمت إضافة المخدوم برقم ' + d.id);
+    closeAddCard();
+    await loadDay();
+    if(summaryData) await loadSummary();
+  } else if(d.status==='exists'){
+    showToast('err','⚠️','الرقم مستخدم','الرقم '+d.id+' موجود قبل كده، جرّب رقم تاني');
+  } else if(d.status==='invalid_id'){
+    showToast('err','❌','رقم غير صحيح','الرقم لازم يكون رقم موجب');
+  } else {
+    showToast('err','✏️','الاسم ناقص','لازم تكتب اسم المخدوم');
+  }
+}
+async function removeStudent(id, name){
+  if(!confirm('حذف المخدوم المُضاف «'+name+'» (رقم '+id+')؟')) return;
+  const r = await fetch('/remove_student', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ id:String(id) })
+  });
+  const d = await r.json();
+  if(d.status==='ok'){
+    showToast('ok','🗑️', name, 'تم حذف المخدوم');
+    await loadDay();
+    if(summaryData) await loadSummary();
+  } else {
+    showToast('err','🔒','مش ممكن الحذف','ده مخدوم من الكشف الأصلي، مش مُضاف يدويًا');
+  }
+}
+$('addToggle').addEventListener('click', toggleAddCard);
+$('addSaveBtn').addEventListener('click', submitAddStudent);
+$('addCancelBtn').addEventListener('click', closeAddCard);
+$('addId').addEventListener('keypress', e=>{ if(e.key==='Enter') submitAddStudent(); });
 
 // ---- scanner ----
 function onScan(text){
