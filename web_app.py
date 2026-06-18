@@ -11,6 +11,9 @@ from attendance import (
     remove_attendance,
     get_day_data,
     get_summary,
+    add_student,
+    remove_added_student,
+    next_student_id,
 )
 
 app = Flask(__name__)
@@ -53,6 +56,28 @@ def uncheck():
     data = request.get_json(silent=True) or {}
     ok = remove_attendance(data.get("id"), data.get("date"))
     return jsonify({"status": "ok" if ok else "missing"})
+
+
+# ----- roster management ---------------------------------------------------
+@app.route("/api/next_id")
+def api_next_id():
+    return jsonify({"next_id": next_student_id()})
+
+
+@app.route("/add_student", methods=["POST"])
+def add_student_route():
+    data = request.get_json(silent=True) or {}
+    result = add_student(data.get("name"), data.get("id"))
+    return jsonify(result)
+
+
+@app.route("/remove_student", methods=["POST"])
+def remove_student_route():
+    data = request.get_json(silent=True) or {}
+    ok = remove_added_student(data.get("id"))
+    # ok is False either because the id is unknown or because it belongs to the
+    # shipped roster, which must never be modified.
+    return jsonify({"status": "ok" if ok else "protected"})
 
 
 # Backwards-compatible alias for the old endpoint name.

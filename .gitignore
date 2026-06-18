@@ -4,3 +4,4 @@ __pycache__/
 qrcodes/
 _original_backup/
 data/attendance.xlsx
+data/students_added.xlsx
